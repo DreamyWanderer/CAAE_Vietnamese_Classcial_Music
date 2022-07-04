@@ -1,6 +1,6 @@
 from yaml import load
 import CVAE
-from CVAE import dataset, num_epoch, batch_size, coding_size
+from CVAE import dataset, num_epoch, batch_size, coding_size, num_type
 
 import tensorboard
 
@@ -42,6 +42,25 @@ def construct_Discriminator():
 
     return Discriminator
 
+def construct_Condition_discriminator():
+
+    input_Discriminator = layers.Input( shape = [28, 28], name = "Input_Discriminator")
+    flatten = layers.Flatten(name = "Flatten_layer")(input_Discriminator)
+    hidden_layer_1 = layers.Dense(150, activation = "selu", name = "Hidden_layer_1")(input_Discriminator)
+    batchnorm_layer_1 = layers.BatchNormalization(name = "Batchnorm_1")(hidden_layer_1)
+    leakyLU_layer_1 = layers.LeakyReLU(0.2, name = "LeakyLU_layer_1")(batchnorm_layer_1)
+    hidden_layer_2 = layers.Dense(150, activation = "selu", name = "Hidden_layer_2")(leakyLU_layer_1)
+    batchnorm_layer_2 = layers.BatchNormalization(name = "Batchnorm_2")(hidden_layer_2)
+    leakyLU_layer_2 = layers.LeakyReLU(0.2, name = "Leaky_layer_2")(batchnorm_layer_2)
+    output_Discriminator = layers.Dense(1, activation = "sigmoid")(leakyLU_layer_2)
+
+    Discriminator = models.Model(inputs = input_Discriminator, outputs = output_Discriminator)
+    Discriminator.compile(loss = "binary_crossentropy", optimizer = optimizers.Adam(learning_rate = 0.0002) )
+
+    utils.plot_model(Discriminator, show_shapes = True, show_dtype = True, to_file = "Conditional_discriminator.png")
+
+    return Discriminator    
+
 def train_AAE():
 
     test_log_dir = CVAE.get_run_logdir()
@@ -50,6 +69,7 @@ def train_AAE():
     #Prepare all related model
     VAE = CVAE.construct_VAE(False)
     Discriminator = construct_Discriminator()
+    Condition_discriminator = construct_Condition_discriminator()
     Encoder = VAE.get_layer(name = "Encoder")
     Decoder = VAE.get_layer(name = "Decoder")
 
@@ -62,6 +82,18 @@ def train_AAE():
     AAE.compile(loss = "binary_crossentropy", optimizer = optimizers.Adam(learning_rate = 0.0002) )
 
     utils.plot_model(AAE, show_shapes = True, show_dtype = True, to_file = "AAE.png")
+
+    #Build the second part of CAAE
+    input_data = Encoder.input
+    input_label = layers.Input( (num_type, ), name = "Label_input")
+    x = VAE((input_data, input_label))
+    #x = layers.Concatenate(name = "Concat_label", axis = 1)([x, input_label])
+    condition_output = Condition_discriminator(x)
+    CAAE = models.Model([input_data, input_label], condition_output)
+    Condition_discriminator.trainable = False
+    CAAE.compile(loss = "binary_crossentropy", optimizer = optimizers.Adam(learning_rate = 0.0002) )
+
+    utils.plot_model(CAAE, show_shapes = True, show_dtype = True, to_file = "CAAE.png")
 
     #Number of batch in each epoch
     num_iter = len(dataset)
@@ -77,7 +109,6 @@ def train_AAE():
             loss_VAE = VAE.train_on_batch(X_batch, X_batch[0])
 
             #Phase 2: train the discriminator
-            
             real_distribution = tf.random.normal(shape = [batch_size, coding_size], mean = 0.0, stddev = 5.0)
             _, _, fake_distribution = Encoder(X_batch[0])
             X_fake_and_real = tf.concat([fake_distribution, real_distribution], axis = 0)
@@ -88,11 +119,24 @@ def train_AAE():
             label = tf.constant([[1.]] * batch_size)
             loss_encoder = AAE.train_on_batch(X_batch[0], label)
 
+            #Phase 4: train the conditional discriminator
+            #Not really the CAAE model
+            fake_data = VAE(X_batch)
+            Data_fake_and_real = tf.concat([fake_data, X_batch[0]], axis = 0)
+            label = tf.constant([[0.]] * batch_size + [[1.]] * batch_size)
+            loss_Conditional_discriminator = Condition_discriminator.train_on_batch(Data_fake_and_real, label)
+
+            #Phase 5: train the decoder generator
+            label = tf.constant([[1.]] * batch_size)
+            loss_decoder = CAAE.train_on_batch(X_batch, label)
+
             #Log to Tensorboard
             with writer.as_default():
                 tf.summary.scalar('Loss VAE', loss_VAE, epoch * num_iter + x)
                 tf.summary.scalar('Loss Discriminator', loss_Discriminator, epoch * num_iter + x)
                 tf.summary.scalar('Loss Encoder generator', loss_encoder, epoch * num_iter + x)
+                tf.summary.scalar('Loss Conditional discriminator', loss_Conditional_discriminator, epoch * num_iter + x)
+                tf.summary.scalar('Loss Decoder generator', loss_decoder, epoch * num_iter + x)
 
             x += 1
 

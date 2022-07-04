@@ -62,6 +62,7 @@ class_name = ["T-shirt/top", "Trouser", "Pullover", "Dress", "Coat", "Sandal", "
 one_hot_train = utils.to_categorical(Y_train, num_classes = num_type)
 one_hot_valid = utils.to_categorical(Y_valid, num_classes = num_type)
 
+X_train = np.float32(X_train)
 dataset = tf.data.Dataset.from_tensor_slices( (X_train, one_hot_train) )
 dataset = dataset.batch(batch_size, drop_remainder = True).prefetch(1)
 
