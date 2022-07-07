@@ -1,6 +1,6 @@
 from yaml import load
 import CVAE
-from CVAE import dataset, num_epoch, batch_size, coding_size, num_type
+from CVAE import dataset, dataset_test, num_epoch, batch_size, coding_size, num_type
 
 import tensorboard
 
@@ -27,6 +27,7 @@ import os
 def construct_Discriminator():
 
     input_Discriminator = layers.Input( (coding_size,), name = "Input_Discriminator")
+    
     hidden_layer_1 = layers.Dense(150, activation = "selu", name = "Hidden_layer_1")(input_Discriminator)
     batchnorm_layer_1 = layers.BatchNormalization(name = "Batchnorm_1")(hidden_layer_1)
     leakyLU_layer_1 = layers.LeakyReLU(0.2, name = "LeakyLU_layer_1")(batchnorm_layer_1)
@@ -137,6 +138,7 @@ def train_AAE():
                 tf.summary.scalar('Loss Encoder generator', loss_encoder, epoch * num_iter + x)
                 tf.summary.scalar('Loss Conditional discriminator', loss_Conditional_discriminator, epoch * num_iter + x)
                 tf.summary.scalar('Loss Decoder generator', loss_decoder, epoch * num_iter + x)
+                tf.summary.scalar('Total loss', loss_VAE + loss_Discriminator + loss_encoder + loss_Conditional_discriminator + loss_decoder, epoch * num_iter + x)
 
             x += 1
 
@@ -147,4 +149,48 @@ def train_AAE():
         Encoder.save("Saved_model\Encoder")
         Decoder.save("Saved_model\Decoder")
 
-train_AAE()
+def test_AAE():
+    
+    load_Model()
+
+def load_Model():
+
+    Encoder = models.load_model("Saved_model\Encoder")
+    Decoder = models.load_model("Saved_model\Decoder")
+    VAE = models.load_model("Saved_model\VAE")
+    Discriminator = models.load_model("Saved_model\Discriminator")
+    AAE = models.load_model("Saved_model\AAE")
+
+    loss_test_VAE = 0
+    loss_test_Discriminator = 0
+    loss_test_encoder = 0
+
+    print(len(dataset_test))
+    i = 0
+
+    for X_test_batch in dataset_test:
+
+        print(i)
+
+        #Phase 1
+        loss_test_VAE = ( VAE.test_on_batch(X_test_batch, X_test_batch[0]) + loss_test_VAE) / 2 
+
+        #Phase 2: train the discriminator
+        real_distribution = tf.random.normal(shape = [batch_size, coding_size], mean = 0.0, stddev = 5.0)
+        _, _, fake_distribution = Encoder(X_test_batch[0])
+        X_fake_and_real = tf.concat([fake_distribution, real_distribution], axis = 0)
+        label = tf.constant([[0.]] * batch_size + [[1.]] * batch_size)
+        loss_test_Discriminator = ( Discriminator.test_on_batch(X_fake_and_real, label) + loss_test_Discriminator) /2 
+
+        #Phase 3: train the encoder generator
+        label = tf.constant([[1.]] * batch_size)
+        loss_test_encoder = ( AAE.test_on_batch(X_test_batch[0], label) + loss_test_encoder) / 2
+
+        i += 1
+
+    print(loss_test_VAE)
+    print(loss_test_Discriminator)
+    print(loss_test_encoder)
+
+#train_AAE()
+test_AAE()

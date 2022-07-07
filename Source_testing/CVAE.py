@@ -63,8 +63,11 @@ one_hot_train = utils.to_categorical(Y_train, num_classes = num_type)
 one_hot_valid = utils.to_categorical(Y_valid, num_classes = num_type)
 
 X_train = np.float32(X_train)
+X_valid = np.float32(X_valid)
 dataset = tf.data.Dataset.from_tensor_slices( (X_train, one_hot_train) )
 dataset = dataset.batch(batch_size, drop_remainder = True).prefetch(1)
+dataset_test = tf.data.Dataset.from_tensor_slices( (X_valid, one_hot_valid) )
+dataset_test = dataset_test.batch(batch_size, drop_remainder = True)
 
 #Define Encoder model
 def construct_Encoder():
@@ -134,7 +137,7 @@ if __name__ == "__main__":
     plt.show()
 
     #Show reconstruction image result
-    show_reconstructions(VAE)
+    #show_reconstructions(VAE)
 
     #Latent space
     _, _, X_valid_compressed = VAE.get_layer("Encoder")(X_valid)
