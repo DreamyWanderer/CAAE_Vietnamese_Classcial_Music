@@ -1,5 +1,7 @@
 from bidict import bidict
 
+import os
+
 emotion = bidict(
     {
         'elated': (1, 1),
@@ -82,4 +84,48 @@ keyEmotion = {
     'A minor': 'serene',
     'A# minor': 'sad',
     'B minor': 'serene',
+}
+
+big_cag = {"classical": 1, "vietnam": 2}
+small_cag = [
+    {
+        "elated": 0,
+        "serene": 1,
+        "sad": 2,
+        "tense": 3
+    },
+    {
+        "elated": 4,
+        "serene": 5,
+        "sad": 6,
+        "tense": 7
+    }
+]
+
+coding_size = 512
+num_type = 8
+batch_size = 32
+num_epoch = 100
+num_row = 130
+
+root_logdir = os.path.join(os.curdir, "my_logs")
+
+encoder_param = {
+    "depth": 3,
+    "num_hidden_node": 1024
+}
+
+decoder_param = {
+    "depth": 3,
+    "num_hidden_node": 1024
+}
+
+encoder_dis = {
+    "depth": 2,
+    "num_hidden_node": 1024
+}
+
+decoder_dis = {
+    "depth": 2,
+    "num_hidden_node": 1024
 }

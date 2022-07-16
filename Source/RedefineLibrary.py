@@ -90,7 +90,7 @@ def _pianoroll_to_notes(
             start = boundaries[2 * note_idx]
             end = boundaries[2 * note_idx + 1]
             if encode_velocity:
-                velocity = array[start, i]
+                velocity = min(array[start, i], 127)
             else:
                 velocity = default_velocity
 

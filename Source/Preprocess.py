@@ -70,7 +70,7 @@ def normalizedDataset(midiPath):
     JSONpath_normalized = "Dataset\Dataset_normalized\\" + str(id_pianoroll) + ".json"
 
     midi_data = pretty_midi.PrettyMIDI(midiPath)
-    score = muspy.from_pretty_midi(midi_data, 24) # A quaternote has 48 time step
+    score = muspy.from_pretty_midi(midi_data, 24) # A quaternote has 24 time step
 
     groupTracks(score)
     score.infer_barlines_and_beats()
@@ -380,13 +380,15 @@ def createSamples(pianoroll: np.ndarray, num_bar, path, id):
 
     writeJSONFile('Dataset\Samples\link.json', dic)
 
-#createMetadaOriginalDataset('Dataset\Dataset_original\Classical_dataset\mond_3.mid')
-normalizedDataset('Dataset\Dataset_original\Classical_dataset\mond_3.mid')
-writeJSONFile('Dataset\Samples\link.json', {})
-createSamples(np.load('Dataset\Dataset_normalized\\1.npy'), 2, 'Dataset\Samples', 1)
+if __name__ == "__main__":
 
-pianoroll = np.load("Dataset\Dataset_normalized\\13.npy")
-score = muspy.from_pianoroll_representation(pianoroll)
-score.tempos = inferListTimeTempo(pianoroll)
-inferKey(score)
+    #createMetadaOriginalDataset('Dataset\Dataset_original\Classical_dataset\mond_3.mid')
+    normalizedDataset('Dataset\Dataset_original\Classical_dataset\mond_3.mid')
+    writeJSONFile('Dataset\Samples\link.json', {})
+    createSamples(np.load('Dataset\Dataset_normalized\\1.npy'), 2, 'Dataset\Samples', 1)
+
+    pianoroll = np.load("Dataset\Dataset_normalized\\13.npy")
+    score = muspy.from_pianoroll_representation(pianoroll)
+    score.tempos = inferListTimeTempo(pianoroll)
+    inferKey(score)
 
