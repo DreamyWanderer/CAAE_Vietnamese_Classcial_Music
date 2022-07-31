@@ -106,7 +106,7 @@ coding_size = 512
 num_type = 8
 batch_size = 32
 num_epoch = 100
-num_row = 130
+num_feature = 130
 
 root_logdir = os.path.join(os.curdir, "my_logs")
 

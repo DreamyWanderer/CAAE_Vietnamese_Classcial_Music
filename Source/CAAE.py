@@ -23,7 +23,7 @@ from tqdm import tqdm
 import os
 
 import Config
-import Pipline
+import Pipeline
 
 def construct_Discriminator():
 
@@ -104,10 +104,7 @@ def train_AAE():
     utils.plot_model(CAAE, show_shapes = True, show_dtype = True, to_file = "CAAE.png")
 
     #Number of batch in each epoch
-    dataset = Pipline.pianoroll_reader_dataset("Dataset\Samples\*.npy")
-    print(dataset)
-    print(dataset[0])
-    print(dataset[1])
+    dataset = Pipeline.pianoroll_reader_dataset("Dataset\Samples\*.npy")
 
     for epoch in range(Config.num_epoch):
 

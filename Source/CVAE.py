@@ -19,7 +19,6 @@ import numpy as np
 import os
 
 import Config
-import Pipline
 
 def get_run_logdir():
     import time
@@ -48,16 +47,15 @@ def construct_Encoder():
 
     depth = Config.encoder_param["depth"]
 
-    input_encoder = layers.Input( (None, Config.num_row), name = "Encoder_input")
+    input_encoder = layers.Input( (None, Config.num_feature), name = "Encoder_input")
 
     x = input_encoder
     for i in range(depth - 1):
         x = layers.LSTM(Config.encoder_param["num_hidden_node"], return_sequences = True, name = f"LSTM_encoder_{i + 1}")(x)
 
     end_LSTM = layers.LSTM(Config.encoder_param["num_hidden_node"], name = f"LSTM_encoder_{depth}")(x)
-    dense = layers.Dense(Config.num_type, activation = "ReLU", name = "Dense_encoder_1")(end_LSTM)
-    coding_mean = layers.Dense(Config.coding_size, name = "Mean_layer")(dense)
-    coding_log_var = layers.Dense(Config.coding_size, name = "Variance_layer")(dense)
+    coding_mean = layers.Dense(Config.coding_size, name = "Mean_layer")(end_LSTM)
+    coding_log_var = layers.Dense(Config.coding_size, name = "Variance_layer")(end_LSTM)
     output_encoder = Sampling(name = "Encoder_output")([coding_mean, coding_log_var])
     Encoder = models.Model(input_encoder, outputs = [coding_mean, coding_log_var, output_encoder], name = "Encoder")
 
@@ -69,16 +67,15 @@ def construct_Encoder():
 def construct_Decoder():
 
     input_decoder = layers.Input( (Config.coding_size + Config.num_type, ), name = "Decoder_input")
-    input_timestep = layers.Input( (None, Config.num_row), name = "Decoder_input_num_timestep")
-    dense = layers.Dense(Config.coding_size + Config.num_type, activation = "tanh", name = "Dense_decoder_1")(input_decoder)
-    repeat_layer = RepeatTime()([dense, input_timestep])
+    input_timestep = layers.Input( (None, Config.num_feature), name = "Decoder_input_num_timestep")
+    repeat_layer = RepeatTime()([input_decoder, input_timestep])
     x = repeat_layer
 
     depth = Config.decoder_param["depth"]
     for i in range(depth):
         x = layers.LSTM(Config.decoder_param["num_hidden_node"], return_sequences = True, name = f"LSTM_decoder_{i + 1}")(x)
     
-    output_decoder = layers.TimeDistributed( layers.Dense(Config.num_row, activation = "sigmoid", name = "Decoder_output"))(x)
+    output_decoder = layers.TimeDistributed( layers.Dense(Config.num_feature, activation = "tanh", name = "Decoder_output"))(x)
 
     Decoder = models.Model([input_decoder, input_timestep], output_decoder, name = "Decoder")
 
@@ -105,6 +102,7 @@ def construct_VAE(usingKL = True):
     latent_loss = -0.5 * backend.sum( 1 + coding_log_var - backend.exp(coding_log_var) - backend.square(coding_mean), axis = -1 )
     if usingKL:
         VAE.add_loss( backend.mean(latent_loss) / 784 )
+
     VAE.compile(loss = "binary_crossentropy", optimizer = optimizers.Adam(learning_rate = 0.0002) )
 
     return VAE

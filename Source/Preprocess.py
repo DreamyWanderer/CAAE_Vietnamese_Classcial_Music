@@ -367,14 +367,14 @@ def createSamples(pianoroll: np.ndarray, num_bar, path, id):
     while i + num_bar < numBar:
         start = listTimeFirstBeat[i].time
         end = listTimeFirstBeat[i + num_bar].time
-        sample = pianoroll[start : end - 1, ::]
-        np.save(path + '\\' + str(id_sample) + '.npy', sample)
+        sample = pianoroll[start : end, ::]
+        np.save(path + '\\Pianorolls\\' + str(id_sample) + '.npy', sample)
         dic.update( {str(id_sample): id_str} )
         id_sample += 1
         i += 1
 
     sample = pianoroll[ listTimeFirstBeat[i].time :, ::]
-    np.save(path + '\\' + str(id_sample) + '.npy', sample)
+    np.save(path + '\\Pianorolls\\' + str(id_sample) + '.npy', sample)
     dic.update( {str(id_sample): id_str} )
     id_sample += 1
 
@@ -387,7 +387,7 @@ if __name__ == "__main__":
     writeJSONFile('Dataset\Samples\link.json', {})
     createSamples(np.load('Dataset\Dataset_normalized\\1.npy'), 2, 'Dataset\Samples', 1)
 
-    pianoroll = np.load("Dataset\Dataset_normalized\\13.npy")
+    pianoroll = np.load("Dataset\Samples\Pianorolls\\265.npy")
     score = muspy.from_pianoroll_representation(pianoroll)
     score.tempos = inferListTimeTempo(pianoroll)
     inferKey(score)
