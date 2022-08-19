@@ -122,7 +122,7 @@ decoder_param = {
 
 encoder_dis = {
     "depth": 2,
-    "num_hidden_node": 1024
+    "num_hidden_node": 512
 }
 
 decoder_dis = {

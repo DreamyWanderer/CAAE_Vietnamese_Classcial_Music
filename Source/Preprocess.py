@@ -187,7 +187,7 @@ def inferListTimeBeat(pianoroll: np.ndarray):
 
 def inferKey(score):
     '''
-    Đoán giọng của bản nhạc (để xử dụng cho thao tác biến đổi dataset)
+    Đoán giọng của bản nhạc (để sử dụng cho thao tác biến đổi dataset)
 
     Input -- Music object
     Output -- Trả về đối tượng Key của thư viện music21 chứa thông tin của khóa

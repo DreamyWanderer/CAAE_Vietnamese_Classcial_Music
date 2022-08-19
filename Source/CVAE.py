@@ -29,6 +29,7 @@ def get_run_logdir():
 class Sampling(layers.Layer):
     
     def call(self, inputs):
+
         mean, log_var = inputs
         
         return backend.random_normal(tf.shape(log_var)) * backend.exp(log_var/2) + mean
@@ -59,7 +60,7 @@ def construct_Encoder():
     output_encoder = Sampling(name = "Encoder_output")([coding_mean, coding_log_var])
     Encoder = models.Model(input_encoder, outputs = [coding_mean, coding_log_var, output_encoder], name = "Encoder")
 
-    utils.plot_model(Encoder, show_shapes = True, show_dtype = True, to_file = "Encoder.png")
+    utils.plot_model(Encoder, show_shapes = True, show_dtype = True, to_file = "Document\\Model_diagram\\Encoder.png")
 
     return Encoder
 
@@ -79,7 +80,7 @@ def construct_Decoder():
 
     Decoder = models.Model([input_decoder, input_timestep], output_decoder, name = "Decoder")
 
-    utils.plot_model(Decoder, to_file= "Decoder.png", show_shapes = True, show_dtype = True)
+    utils.plot_model(Decoder, to_file= "Document\\Model_diagram\\Decoder.png", show_shapes = True, show_dtype = True)
 
     return Decoder
 
@@ -95,7 +96,7 @@ def construct_VAE(usingKL = True):
     concat_layer = layers.Concatenate(name = "Concatenate_layer")([latent_space, Label_input])
     VAE_output = Decoder([concat_layer, VAE_input])
     VAE = models.Model(inputs = [VAE_input, Label_input], outputs = VAE_output, name = "VAE")
-    utils.plot_model(VAE, to_file= "VAE.png", show_shapes = True, show_dtype = True)
+    utils.plot_model(VAE, to_file= "Document\\Model_diagram\\VAE.png", show_shapes = True, show_dtype = True)
 
     coding_log_var = Encoder.get_layer("Variance_layer").output
     coding_mean = Encoder.get_layer("Mean_layer").output
