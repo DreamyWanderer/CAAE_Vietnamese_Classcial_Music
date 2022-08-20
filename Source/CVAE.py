@@ -43,6 +43,17 @@ class RepeatTime(layers.Layer):
 
         return backend.repeat(vector, numTimestep)
 
+def metric_accuracy(y_true, y_pred):
+    '''
+    Calculate accuracy of reconstruction
+    '''
+
+    first_part_compare = backend.equal(tf.math.ceil(y_true[::, ::, 0:129]), tf.math.ceil(y_pred[::, ::, 0:129]) ) #Construction accuracy of melody and beat part
+    second_part_compare = backend.equal( y_true[::, ::, 129:], y_pred[::, ::, 129:] )
+    combine_part = tf.concat( [first_part_compare, second_part_compare], -1)
+
+    return backend.mean(combine_part)
+
 #Define Encoder model
 def construct_Encoder():
 
@@ -104,7 +115,7 @@ def construct_VAE(usingKL = True):
     if usingKL:
         VAE.add_loss( backend.mean(latent_loss) / 784 )
 
-    VAE.compile(loss = "binary_crossentropy", optimizer = optimizers.Adam(learning_rate = 0.0002) )
+    VAE.compile(loss = "binary_crossentropy", optimizer = optimizers.Adam(learning_rate = 0.0002), metrics = [metric_accuracy] )
 
     return VAE
 

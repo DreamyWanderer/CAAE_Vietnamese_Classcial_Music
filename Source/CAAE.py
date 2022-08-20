@@ -1,4 +1,6 @@
+from ast import Lambda
 from pyexpat import model
+from turtle import back
 from yaml import load
 import CVAE
 
@@ -42,33 +44,29 @@ class RandomWeightedAverage(layers.Layer):
     def call(self, inputs):
 
         input_shape = tf.shape(inputs[0])
-        alpha = backend.random_uniform((input_shape[0], 1))
+        alpha = backend.random_uniform((input_shape[0], 1)) # Or (input_shape[0], 1, 1) shape, does not matter because of broadcasting property of tensor
 
         return (alpha * inputs[0]) + ((1 - alpha) * inputs[1])
+
+def grad(y, x):
+
+    V = layers.Lambda(lambda z: backend.gradients(z[0], z[1]), output_shape = [1])([y, x])
+
+    return V
 
 def wasserstein(y_true, y_pred):
 
     return backend.mean(y_true * y_pred)
 
-def metric_accuracy(y_true, y_pred):
-    '''
-    Calculate accuracy of reconstruction
-    '''
-
-    first_part_compare = backend.equal(tf.math.ceil(y_true[::, ::, 0:129]), tf.math.ceil(y_pred[::, ::, 0:129]) ) #Construction accuracy of melody and beat part
-    second_part_compare = backend.equal( y_true[::, ::, 129:], y_pred[::, ::, 129:] )
-    combine_part = tf.concat( [first_part_compare, second_part_compare], -1)
-
-    return backend.mean(combine_part)
-
 #This function receive three argument since the interpolated_samples are not detected until training. y_true argument is only a dummy tensor when compile the Critic WP
 def gradient_penalty_loss(y_true, y_pred, interpolated_samples):
 
-    gradients = backend.gradients(y_pred, interpolated_samples)[0]
+    tf.print(y_pred)
+    gradients = grad(y_pred, interpolated_samples)[0]
     gradient_square = backend.square(gradients)
-    gradient_sqaure_sum = backend.sum(gradient_square, axis = np.arange(1, len(gradient_square.shape)))
-    gradient_l2_norm = backend.square(gradient_sqaure_sum)
-    gradient_penalty = backend.sqaure(1 - gradient_l2_norm)
+    gradient_square_sum = backend.sum(gradient_square, axis = np.arange(1, len(gradient_square.shape)))
+    gradient_l2_norm = backend.sqrt(gradient_square_sum)
+    gradient_penalty = backend.square(1 - gradient_l2_norm)
 
     return backend.mean(gradient_penalty)
 
@@ -116,11 +114,11 @@ def construct_Encoder_critic_WP(Encoder_critic: models.Model):
     fake_input = layers.Input(shape = [Config.coding_size], name = "Fake_input")
     interpolated_img = RandomWeightedAverage(trainable = False)([real_input, fake_input])
     validity_interpolated = Encoder_critic([interpolated_img])
-    partial_gp_loss = partial(gradient_penalty_loss, interpolated_img = validity_interpolated)
+    partial_gp_loss = partial(gradient_penalty_loss, interpolated_samples = interpolated_img)
     partial_gp_loss.__name__ = 'gradient_penalty'
 
     Encoder_critic_WP = models.Model(inputs = [real_input, fake_input], outputs = validity_interpolated)
-    Encoder_critic.compile(loss = partial_gp_loss, optimizer = optimizers.Adam(learning_rate = 0.0002) )
+    Encoder_critic_WP.compile(loss = partial_gp_loss, optimizer = optimizers.Adam(learning_rate = 0.0002) )
 
     utils.plot_model(Encoder_critic_WP, show_shapes = True, show_dtype = True, to_file = "Document\\Model_diagram\\Encoder_critic_WP.png")
 
@@ -133,7 +131,7 @@ def construct_Decoder_critic_WP(Decoder_critic: models.Model):
     pianoroll_label = layers.Input(shape = [Config.num_type], name = "Label_input")
     interpolated_img = RandomWeightedAverage(trainable = False)([real_input, fake_input])
     validity_interpolated = Decoder_critic([interpolated_img, pianoroll_label])
-    partial_gp_loss = partial(gradient_penalty_loss, interpolated_img = validity_interpolated)
+    partial_gp_loss = partial(gradient_penalty_loss, interpolated_samples = interpolated_img)
     partial_gp_loss.__name__ = 'gradient_penalty'
 
     Decoder_critic_WP = models.Model(inputs = [real_input, fake_input, pianoroll_label], outputs = validity_interpolated)
@@ -145,8 +143,11 @@ def construct_Decoder_critic_WP(Decoder_critic: models.Model):
 
 def train_loop():
 
+    #Create writer summary for Tensorboard
     test_log_dir = CVAE.get_run_logdir()
-    writer = summary.create_file_writer(test_log_dir)
+    writer_summary = []
+    for x in Config.list_summary_writer:
+        writer_summary.append( summary.create_file_writer( os.path.join(test_log_dir, x) ) )
 
     #Prepare all related model
     VAE = CVAE.construct_VAE(False)
@@ -178,51 +179,60 @@ def train_loop():
 
     utils.plot_model(CAAE, show_shapes = True, show_dtype = True, to_file = "Document\\Model_diagram\\CAAE.png")
 
-    #Number of batch in each epoch
+    # Prepare data and counter
     dataset = Pipeline.dataset
-    num_iter = 0
+    x = 0
 
     for epoch in range(Config.num_epoch):
 
         print('Epoch %s:' % epoch)
-        x = 0
 
         for X_batch in dataset:
 
-            batch_size = tf.shape(X_batch[0])[0]
+            #batch_size = tf.shape(X_batch[0])[0]
+            batch_size = 32
 
             #Phase 1: train VAE
-            loss_VAE = VAE.train_on_batch(X_batch, X_batch[0])
+            #loss_VAE = VAE.train_on_batch(X_batch, X_batch[0])
 
             #Phase 2: train the Encoder critic
-            real_label = tf.constant([[1.]] * batch_size)
-            fake_label = tf.constant([[-1.]] * batch_size)
-            real_distribution = tf.random.normal(shape = [batch_size, Config.coding_size], mean = 0.0, stddev = 5.0)
-            loss_Encoder_critic_real = Encoder_critic.train_on_batch(real_distribution, real_label)
-            _, _, fake_distribution = Encoder(X_batch[0])
-            loss_Encoder_critic_fake = Encoder_critic.train_on_batch(fake_distribution, fake_label)
-            loss_Encoder_critic = backend.mean(loss_Encoder_critic_real + loss_Encoder_critic_fake)
+            for _ in range(5):
+
+                real_label = tf.constant([[1.]] * batch_size)
+                fake_label = tf.constant([[-1.]] * batch_size)
+                real_distribution = tf.random.normal(shape = [batch_size, Config.coding_size], mean = 0.0, stddev = 5.0)
+                loss_Encoder_critic_real = Encoder_critic.train_on_batch(real_distribution, real_label)
+                _, _, fake_distribution = Encoder(X_batch[0])
+                loss_Encoder_critic_fake = Encoder_critic.train_on_batch(fake_distribution, fake_label)
+                loss_Encoder_gradient_penalty = Encoder_critic_WP.train_on_batch([real_distribution, fake_distribution], real_label) #Real_label target is just for fun since we will use interpolated and 1s label target later
+                loss_Encoder_critic = backend.mean(loss_Encoder_critic_real + loss_Encoder_critic_fake + loss_Encoder_gradient_penalty)
 
             #Phase 3: train the Encoder generator
             loss_encoder = AAE.train_on_batch(X_batch[0], real_label)
 
             #Phase 4: train the Decoder critic
-            loss_Decoder_critic_real = Decoder_critic.train_on_batch(X_batch, real_label)
-            fake_data = VAE(X_batch)
-            loss_Decoder_critic_fake = Decoder_critic.train_on_batch([fake_data, X_batch[1]], fake_label)
-            loss_Decoder_critic = backend.mean(loss_Decoder_critic_fake + loss_Decoder_critic_real)
+            for _ in range(5):
+
+                loss_Decoder_critic_real = Decoder_critic.train_on_batch(X_batch, real_label)
+                fake_data = VAE(X_batch)
+                loss_Decoder_critic_fake = Decoder_critic.train_on_batch([fake_data, X_batch[1]], fake_label)
+                loss_Decoder_gradient_penalty = Decoder_critic_WP.train_on_batch([ X_batch[0], fake_data, X_batch[1] ])
+                loss_Decoder_critic = backend.mean(loss_Decoder_critic_fake + loss_Decoder_critic_real + loss_Decoder_gradient_penalty)
 
             #Phase 5: train the Decoder generator
             label = tf.constant([[1.]] * Config.batch_size)
             loss_decoder = CAAE.train_on_batch(X_batch, real_label)
 
             #Log to Tensorboard
-            with writer.as_default():
-                tf.summary.scalar('Loss VAE', loss_VAE, epoch * num_iter + x)
-                tf.summary.scalar('Loss Encoder critic', loss_Encoder_critic, epoch * num_iter + x)
-                tf.summary.scalar('Loss Encoder generator', loss_encoder, epoch * num_iter + x)
-                tf.summary.scalar('Loss Decoder critic', loss_Decoder_critic, epoch * num_iter + x)
-                tf.summary.scalar('Loss Decoder generator', loss_decoder, epoch * num_iter + x)
+            for x in range(0, 5):
+                with writer_summary[x].as_default():
+                    tf.summary.scalar('Train Loss', loss_VAE[0], x)
+                    tf.summary.scalar('Train Loss', loss_Encoder_critic, x)
+                    tf.summary.scalar('Train Loss', loss_encoder, x)
+                    tf.summary.scalar('Train Loss', loss_Decoder_critic, x)
+                    tf.summary.scalar('Train Loss', loss_decoder, x)
+            with writer_summary[5].as_default():
+                    tf.summary.scalar('Train accuracy', loss_VAE[1], x)
 
             x += 1
 

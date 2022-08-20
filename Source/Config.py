@@ -129,3 +129,5 @@ decoder_dis = {
     "depth": 2,
     "num_hidden_node": 1024
 }
+
+list_summary_writer = ["train_loss_VAE", "train_loss_Enoder_critic", "train_loss_Encoder_generator", "train_loss_Decoder_critic", "train_loss_Decoder_generator", "train_accuracy", "valid_loss_VAE", "valid_loss_Enoder_critic", "valid_loss_Encoder_generator", "valid_loss_Decoder_critic", "valid_loss_Decoder_generator"]
