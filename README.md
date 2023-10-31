@@ -1,4 +1,4 @@
-# CAAE_Vietnamese_Classcial_music
+# CAAE_Vietnamese_Classcial_Music
 
 **This is not the completed code for this project. I am currently reviewing the related documents, papers to plan a better approach for this project. As soon as this steps is done, I will continue coding this project.**
 
